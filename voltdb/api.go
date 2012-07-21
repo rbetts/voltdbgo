@@ -3,7 +3,6 @@ package voltdbgo
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"net"
 )
 
@@ -55,17 +54,34 @@ func NewConn(user string, passwd string, laddr, raddr *net.TCPAddr) (*Conn, erro
 // GoString provides a default printable format for Conn
 func (conn *Conn) GoString() string {
 	if conn.connData != nil {
-		return conn.connData.GoString()
+        return fmt.Sprintf("hostId:%v, connId:%v, leaderAddr:%v buildString:%v",
+        conn.connData.hostId, conn.connData.connId,
+        conn.connData.leaderAddr, conn.connData.buildString)
 	}
 	return "uninitialized"
 }
 
-// GoString provides a default printable format for connectionData
-func (conn *connectionData) GoString() string {
-	return fmt.Sprintf("hostId:%v, connId:%v, leaderAddr:%v buildString:%v",
-		conn.hostId, conn.connId, conn.leaderAddr, conn.buildString)
+// Call invokes the procedure 'procedure' with parameter values 'params'.
+func (conn *Conn) Call(procedure string, handle int64, params ...interface{}) error {
+	buf, err := serializeCall(procedure, handle, params)
+	if err != nil {
+		return err
+	}
+	if err := conn.writeMessage(buf); err != nil {
+		return err
+	}
+	return nil
 }
 
+// Read parses a Call response.
+func (conn *Conn) Read() (response *Response, err error) {
+	buf, err := conn.readMessage()
+	if err != nil {
+		return nil, err
+	}
+	response, err = deserializeCallResponse(buf)
+	return
+}
 // Response is a stored procedure result.
 type Response struct {
 	clientData      int64
@@ -93,11 +109,6 @@ func (rsp *Response) GoString() string {
 		rsp.clusterLatency, rsp.appStatus, rsp.appStatusString)
 }
 
-// writeMessage prepends a header and writes header and buf to tcpConn
-// Table represents a VoltDB table, often as a procedure result set.
-// Wrap up some metdata with pointer(s) to row data. Tables are
-// relatively cheap to copy (the associated user data is copied
-// reference).
 type Table struct {
 	statusCode  int8
 	columnCount int16
@@ -117,72 +128,3 @@ type Row struct {
 	vals []interface{}
 }
 
-func (conn *Conn) writeMessage(buf bytes.Buffer) error {
-	length := buf.Len() + 1 // length includes proto version.
-	var hdr bytes.Buffer
-	writeInt(&hdr, int32(length))
-	writeProtoVersion(&hdr)
-	io.Copy(conn.tcpConn, &hdr)
-	io.Copy(conn.tcpConn, &buf)
-	return nil // TODO: obviously wrong
-}
-
-// readMessageHdr reads the standard wireprotocol header.
-func (conn *Conn) readMessageHdr() (size int32, err error) {
-	// Total message length Integer  4
-	size, err = readInt(conn.tcpConn)
-	if err != nil {
-		return
-	}
-	// Version Byte 1
-	// TODO: error on incorrect version.
-	_, err = readByte(conn.tcpConn)
-
-	// size includes the protocol version.
-	return (size - 1), nil
-}
-
-// readLoginResponse parses the login response message.
-func (conn *Conn) readMessage() (*bytes.Buffer, error) {
-	size, err := conn.readMessageHdr()
-	if err != nil {
-		return nil, err
-	}
-	data := make([]byte, size)
-	if _, err = io.ReadFull(conn.tcpConn, data); err != nil {
-		return nil, err
-	}
-	buf := bytes.NewBuffer(data)
-	return buf, nil
-}
-
-// Call invokes the procedure 'procedure' with parameter values 'params'.
-func (conn *Conn) Call(procedure string, handle int64, params ...interface{}) error {
-	buf, err := serializeCall(procedure, handle, params)
-	if err != nil {
-		return err
-	}
-	if err := conn.writeMessage(buf); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (conn *Conn) readLoginResponse() (*connectionData, error) {
-	buf, err := conn.readMessage()
-	if err != nil {
-		return nil, err
-	}
-	connData, err := deserializeLoginResponse(buf)
-	return connData, err
-}
-
-// Read parses a Call response.
-func (conn *Conn) Read() (response *Response, err error) {
-	buf, err := conn.readMessage()
-	if err != nil {
-		return nil, err
-	}
-	response, err = deserializeCallResponse(buf)
-	return
-}

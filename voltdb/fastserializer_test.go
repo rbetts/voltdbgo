@@ -123,7 +123,7 @@ func TestRoundTripString(t *testing.T) {
 func TestReflection(t *testing.T) {
 	var b bytes.Buffer
 	var expInt8 int8 = 5
-	marshal(&b, expInt8)
+	marshalParam(&b, expInt8)
 	rVtByte, _ := readByte(&b) // volttype
 	if rVtByte != vt_BOOL {
 		t.Errorf("reflect failed to write volttype byte")
@@ -135,7 +135,7 @@ func TestReflection(t *testing.T) {
 
 	b.Reset()
 	var expString string = "abcde"
-	marshal(&b, expString)
+	marshalParam(&b, expString)
 	rVtString, _ := readByte(&b) // volttype
 	if rVtString != vt_STRING {
 		t.Errorf("reflect failed to write volttype string")
