@@ -360,9 +360,9 @@ func deserializeCallResponse(r io.Reader) (response *Response, err error) {
             }
         }
     } else {
-        response.tableBytes = make([][]byte, response.resultCount)
-        for idx, _ := range response.tableBytes {
-            if response.tableBytes[idx], err = readTableBytes(r); err != nil {
+        response.tableBufs = make([]bytes.Buffer, response.resultCount)
+        for idx, _ := range response.tableBufs {
+            if response.tableBufs[idx], err = readTableBuf(r); err != nil {
                 return nil, err
             }
         }
@@ -370,17 +370,20 @@ func deserializeCallResponse(r io.Reader) (response *Response, err error) {
 	return response, nil
 }
 
-func readTableBytes(r io.Reader) ([]byte, error) {
+func readTableBuf(r io.Reader) (bytes.Buffer, error) {
+    var b bytes.Buffer
     ttlLength, err := readInt(r)
     if err != nil {
-        return nil, err
+        return b, err
     }
+    // This copy should be unnecessary; unclear how to create
+    // a set of Buffers as views into the data underlying r.
     var data []byte = make([]byte, ttlLength)
     _, err = r.Read(data)
     if err != nil {
-        return nil, err
+        return b, err
     }
-    return data, nil
+    return *bytes.NewBuffer(data), nil
 }
 
 
