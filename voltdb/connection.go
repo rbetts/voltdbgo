@@ -7,6 +7,11 @@ import (
 	"net"
 )
 
+// kInlineTableDeser when true will deserialize table data
+// in to Response.Tables[].  When false, response deserialization
+// stores table data as bytes in Response.tableData[]
+var kInlineTableDeser bool = false
+
 // Conn is a single connection to a single node of a VoltDB database
 type Conn struct {
 	tcpConn  *net.TCPConn
@@ -47,7 +52,7 @@ func NewConn(user string, passwd string, laddr, raddr *net.TCPAddr) (*Conn, erro
 	return conn, nil
 }
 
-// GoString provides a default printable format
+// GoString provides a default printable format for Conn
 func (conn *Conn) GoString() string {
 	if conn.connData != nil {
 		return conn.connData.GoString()
@@ -55,6 +60,7 @@ func (conn *Conn) GoString() string {
 	return "uninitialized"
 }
 
+// GoString provides a default printable format for connectionData
 func (conn *connectionData) GoString() string {
 	return fmt.Sprintf("hostId:%v, connId:%v, leaderAddr:%v buildString:%v",
 		conn.hostId, conn.connId, conn.leaderAddr, conn.buildString)
@@ -73,6 +79,7 @@ type Response struct {
 	exceptionBytes  []byte
 	resultCount     int16
 	tables          []Table
+    tableBytes      [][]byte
 }
 
 func (rsp *Response) ResultSets() []Table {
@@ -153,6 +160,6 @@ func (conn *Conn) Read() (response *Response, err error) {
 	if err != nil {
 		return nil, err
 	}
-	response, err = deserializeResponse(buf)
+	response, err = deserializeCallResponse(buf)
 	return
 }

@@ -12,7 +12,8 @@ import (
 )
 
 // package private methods that perform voltdb compatible
-// serialization. http://community.voltdb.com/docs/WireProtocol/index
+// de/serialization on the base wire protocol types.
+// See: http://community.voltdb.com/docs/WireProtocol/index
 
 const (
 	vt_ARRAY     int8 = -99 // array (short)(values*)
@@ -303,7 +304,7 @@ func deserializeLoginResponse(r io.Reader) (connData *connectionData, err error)
 }
 
 // readCallResponse reads a stored procedure invocation response.
-func deserializeResponse(r io.Reader) (response *Response, err error) {
+func deserializeCallResponse(r io.Reader) (response *Response, err error) {
 	response = new(Response)
 	if response.clientData, err = readLong(r); err != nil {
 		return nil, err
@@ -351,30 +352,37 @@ func deserializeResponse(r io.Reader) (response *Response, err error) {
 	if response.resultCount, err = readShort(r); err != nil {
 		return nil, err
 	}
-	response.tables = make([]Table, response.resultCount)
-	fmt.Printf("\tDeserializing %v tables\n", response.resultCount)
-	for idx, _ := range response.tables {
-		if response.tables[idx], err = deserializeTable(r); err != nil {
-			return nil, err
-		}
-	}
+    if kInlineTableDeser {
+        response.tables = make([]Table, response.resultCount)
+        for idx, _ := range response.tables {
+            if response.tables[idx], err = deserializeTable(r); err != nil {
+                return nil, err
+            }
+        }
+    } else {
+        response.tableBytes = make([][]byte, response.resultCount)
+        for idx, _ := range response.tableBytes {
+            if response.tableBytes[idx], err = readTableBytes(r); err != nil {
+                return nil, err
+            }
+        }
+    }
 	return response, nil
 }
 
-func serializeParams(params []interface{}) (msg bytes.Buffer, err error) {
-	// parameter count      short
-	// (type byte, parameter)*
-	if err = writeShort(&msg, int16(len(params))); err != nil {
-		return
-	}
-	for _, val := range params {
-		if err = marshal(&msg, val); err != nil {
-			fmt.Printf("\tMarshalling: %v\n", val)
-			return
-		}
-	}
-	return
+func readTableBytes(r io.Reader) ([]byte, error) {
+    ttlLength, err := readInt(r)
+    if err != nil {
+        return nil, err
+    }
+    var data []byte = make([]byte, ttlLength)
+    _, err = r.Read(data)
+    if err != nil {
+        return nil, err
+    }
+    return data, nil
 }
+
 
 func deserializeTable(r io.Reader) (t Table, err error) {
 	var errTable Table
@@ -480,6 +488,21 @@ func deserializeType(volttype int8, r io.Reader) (interface{}, error) {
 		panic("Unknown type in deserialize type")
 	}
 	panic("Unreachable.")
+}
+
+func serializeParams(params []interface{}) (msg bytes.Buffer, err error) {
+	// parameter count      short
+	// (type byte, parameter)*
+	if err = writeShort(&msg, int16(len(params))); err != nil {
+		return
+	}
+	for _, val := range params {
+		if err = marshal(&msg, val); err != nil {
+			fmt.Printf("\tMarshalling: %v\n", val)
+			return
+		}
+	}
+	return
 }
 
 func marshal(w io.Writer, v interface{}) (err error) {
