@@ -14,20 +14,17 @@ See below for some of the more important missing parts.
 The driver connects to a running VoltDB database node and calls procedures.
 The simplest example, omitting correct error handling, is:
 
-    clientConn, _ := NewConn("username", "password", "myserver:21212")
-    response, _ := clientConn.Call("procedurename", "param1", "param2", ...)
-
+    volt, _ := voltdb.NewConnection("username", "", "localhost:21212")
+    response, _ := volt.Call("ProcedureName", "param1", param2, ...)
     type Row struct {
         Attr1 string
-        Attr2 int32
-    }
-    row *Row = &Row{}
-    for table := range response.ResultSets() {
-        for ii := 0; ii < table.RowCount(); ++ii {
-            table.Next(row)
-            fmt.Printf("Row %v: %v, %v\n", ii, row.Attr1, row.Attr2)
-         }
-    }
+        Attr2 int
+     }
+     var row Row
+     for response.Table(0).HasNext() {
+         table.Next(&row)
+         fmt.Printf("Row: %v %v\n", row.Attr1, row.Attr2)
+     }
 
 
 ## Missing
