@@ -1,4 +1,4 @@
-package voltdbgo
+package voltdb
 
 import (
 	"bytes"

@@ -1,4 +1,4 @@
-package voltdbgo
+package voltdb
 
 import (
 	"encoding/binary"
@@ -211,4 +211,3 @@ func writeByteString(w io.Writer, d []byte) error {
 	_, err := w.Write(d)
 	return err
 }
-

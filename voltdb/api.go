@@ -1,15 +1,10 @@
-package voltdbgo
+package voltdb
 
 import (
 	"bytes"
 	"fmt"
 	"net"
 )
-
-// kInlineTableDeser when true will deserialize table data
-// in to Response.Tables[].  When false, response deserialization
-// stores table data as bytes in Response.tableData[]
-var kInlineTableDeser bool = false
 
 // Conn is a single connection to a single node of a VoltDB database
 type Conn struct {
@@ -25,63 +20,61 @@ type connectionData struct {
 	buildString string
 }
 
-// NewConn creates an initialized, authenticated Conn
-func NewConn(user string, passwd string, laddr, raddr *net.TCPAddr) (*Conn, error) {
-	conn := new(Conn)
-	tcpConn, err := net.DialTCP("tcp", laddr, raddr)
-	if err != nil {
+// NewConn creates an initialized, authenticated Conn.
+func NewConnection(user string, passwd string, hostAndPort string) (*Conn, error) {
+	var conn = new(Conn)
+	var err error
+	var raddr *net.TCPAddr
+	var login bytes.Buffer
+
+	if raddr, err = net.ResolveTCPAddr("tcp", hostAndPort); err != nil {
+		return nil, fmt.Errorf("Error resolving %v.", hostAndPort)
+	}
+	if conn.tcpConn, err = net.DialTCP("tcp", nil, raddr); err != nil {
 		return nil, err
 	}
-	conn.tcpConn = tcpConn
-
-	login, err := serializeLoginMessage(user, passwd)
-	if err != nil {
+	if login, err = serializeLoginMessage(user, passwd); err != nil {
 		return nil, err
 	}
-
 	if err = conn.writeMessage(login); err != nil {
 		return nil, err
 	}
-
-	connData, err := conn.readLoginResponse()
-	if err != nil {
+	if conn.connData, err = conn.readLoginResponse(); err != nil {
 		return nil, err
 	}
-	conn.connData = connData
 	return conn, nil
 }
 
-// GoString provides a default printable format for Conn
+// GoString provides a default printable format for Conn.
 func (conn *Conn) GoString() string {
 	if conn.connData != nil {
-        return fmt.Sprintf("hostId:%v, connId:%v, leaderAddr:%v buildString:%v",
-        conn.connData.hostId, conn.connData.connId,
-        conn.connData.leaderAddr, conn.connData.buildString)
+		return fmt.Sprintf("hostId:%v, connId:%v, leaderAddr:%v buildString:%v",
+			conn.connData.hostId, conn.connData.connId,
+			conn.connData.leaderAddr, conn.connData.buildString)
 	}
 	return "uninitialized"
 }
 
-// Call invokes the procedure 'procedure' with parameter values 'params'.
-func (conn *Conn) Call(procedure string, handle int64, params ...interface{}) error {
-	buf, err := serializeCall(procedure, handle, params)
-	if err != nil {
-		return err
-	}
-	if err := conn.writeMessage(buf); err != nil {
-		return err
-	}
-	return nil
-}
+// Call invokes the procedure 'procedure' with parameter values 'params'
+// and returns a pointer to the associated Response.
+func (conn *Conn) Call(procedure string, params ...interface{}) (*Response, error) {
+	var call bytes.Buffer
+	var resp *bytes.Buffer
+	var err error
 
-// Read parses a Call response.
-func (conn *Conn) Read() (response *Response, err error) {
-	buf, err := conn.readMessage()
-	if err != nil {
+	// Use 0 for handle; it's not necessary in pure sync client.
+	if call, err = serializeCall(procedure, 0, params); err != nil {
 		return nil, err
 	}
-	response, err = deserializeCallResponse(buf)
-	return
+	if err := conn.writeMessage(call); err != nil {
+		return nil, err
+	}
+	if resp, err = conn.readMessage(); err != nil {
+		return nil, err
+	}
+	return deserializeCallResponse(resp)
 }
+
 // Response is a stored procedure result.
 type Response struct {
 	clientData      int64
@@ -95,11 +88,14 @@ type Response struct {
 	exceptionBytes  []byte
 	resultCount     int16
 	tables          []Table
-    tableBufs       []bytes.Buffer
 }
 
 func (rsp *Response) ResultSets() []Table {
 	return rsp.tables
+}
+
+func (rsp *Response) Table(offset int) *Table {
+	return &rsp.tables[offset]
 }
 
 func (rsp *Response) GoString() string {
@@ -115,16 +111,26 @@ type Table struct {
 	columnTypes []int8
 	columnNames []string
 	rowCount    int32
-	rows        []Row
+	rows        bytes.Buffer
 }
 
-func (table Table) GoString() string {
+func (table *Table) GoString() string {
 	return fmt.Sprintf("Table: statusCode: %v, columnCount: %v, "+
 		"rowCount: %v\n", table.statusCode, table.columnCount,
 		table.rowCount)
 }
 
-type Row struct {
-	vals []interface{}
+// Rowcount returns the number of rows returned by the server for this table.
+func (table *Table) Rowcount() int {
+	return int(table.rowCount)
 }
 
+// Next populates v (*struct) with the values of the next row.
+func (table *Table) Next(v interface{}) error {
+	return table.next(v)
+}
+
+// HasNext returns true of there are additional rows to read.
+func (table *Table) HasNext() bool {
+	return table.rows.Len() > 0
+}

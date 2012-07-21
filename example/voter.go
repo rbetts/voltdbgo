@@ -1,47 +1,40 @@
 package main
 
 import (
-    "fmt"
-    "log"
-    "net"
-    "github.com/rbetts/voltdbgo"
+	"fmt"
+	"github.com/rbetts/voltdbclient/voltdb"
+	"log"
 )
 
-// An example client using the voltdb driver
-func main() {
-    raddr, err := net.ResolveTCPAddr("tcp", "localhost:21212")
-    if err != nil {
-        log.Fatalf("Error resolving localhost:21212. Exiting.")
-    }
+// A simple example using the voltdb/examples/voter application.
 
-    // connect to the database
-    cxn, err := voltdbgo.NewConn("username", "", nil, raddr)
-    if err != nil {
-        log.Fatalf("Error initializing connection to server: %v. Exiting.", err)
-    }
-    fmt.Printf("Successfully connected. Connection: %#v\n", cxn)
-
-    // call a procedure
-    var handle int64 = 0
-    var phoneNumber int64 = 5084055555
-    var contestant int32 = 3
-    var maxVotes int64 = 10
-    err = cxn.Call("Vote", handle, phoneNumber, contestant, maxVotes)
-    if err != nil {
-        log.Fatalf("Error call Vote procedure: %v. Exiting.", err)
-    }
-
-    // read a response.
-    resp, err := cxn.Read()
-    if err != nil {
-        log.Fatalf("Error reading Vote response: %v. Exiting.", err)
-    }
-    fmt.Printf("%#v", resp)
-    for _, table := range resp.ResultSets() {
-        fmt.Printf("%#v", table)
-    }
-
-    fmt.Printf("done\n")
+type ResultsRow struct {
+	Contestant string
+	Id         int
+	Votes      int
 }
 
+func (row *ResultsRow) GoString() string {
+	return fmt.Sprintf("%v\t%v\t%v\n", row.Contestant, row.Id, row.Votes)
+}
 
+func main() {
+	volt, err := voltdb.NewConnection("username", "", "localhost:21212")
+	if err != nil {
+		log.Fatalf("Connection error %v\n", err)
+	}
+	printResults(volt)
+}
+
+func printResults(volt *voltdb.Conn) {
+	var row ResultsRow
+	response, _ := volt.Call("Results")
+	table := response.Table(0)
+
+	for table.HasNext() {
+		if err := table.Next(&row); err != nil {
+			log.Fatalf("Table iteration error %v\n", err)
+		}
+		fmt.Printf("%#v", &row)
+	}
+}

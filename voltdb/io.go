@@ -1,4 +1,4 @@
-package voltdbgo
+package voltdb
 
 import (
 	"bytes"
@@ -9,6 +9,9 @@ import (
 	"reflect"
 	"runtime"
 )
+
+// io.go includes protocol-level de/serialization code. For
+// example, serialize and write a procedure call to the network.
 
 // writeMessage prepends a header and writes header and buf to tcpConn
 // Table represents a VoltDB table, often as a procedure result set.
@@ -142,7 +145,7 @@ func serializeCall(proc string, ud int64, params []interface{}) (msg bytes.Buffe
 		}
 	}()
 
-    if err = writeString(&msg, proc); err != nil {
+	if err = writeString(&msg, proc); err != nil {
 		return
 	}
 	if err = writeLong(&msg, ud); err != nil {
@@ -173,7 +176,7 @@ func serializeParams(params []interface{}) (msg bytes.Buffer, err error) {
 }
 
 func marshalParam(buf io.Writer, param interface{}) (err error) {
-    v := reflect.ValueOf(param)
+	v := reflect.ValueOf(param)
 	if !v.IsValid() {
 		return errors.New("Can not encode value.")
 	}
@@ -208,7 +211,7 @@ func marshalParam(buf io.Writer, param interface{}) (err error) {
 		writeByte(buf, vt_STRING)
 		err = writeString(buf, x)
 	}
-    return
+	return
 }
 
 // readCallResponse reads a stored procedure invocation response.
@@ -260,46 +263,15 @@ func deserializeCallResponse(r io.Reader) (response *Response, err error) {
 	if response.resultCount, err = readShort(r); err != nil {
 		return nil, err
 	}
-    if kInlineTableDeser {
-        response.tables = make([]Table, response.resultCount)
-        for idx, _ := range response.tables {
-            if response.tables[idx], err = deserializeTable(r); err != nil {
-                return nil, err
-            }
-        }
-    } else {
-        response.tableBufs = make([]bytes.Buffer, response.resultCount)
-        for idx, _ := range response.tableBufs {
-            if response.tableBufs[idx], err = readTableBuf(r); err != nil {
-                return nil, err
-            }
-        }
-    }
+
+	response.tables = make([]Table, response.resultCount)
+	for idx, _ := range response.tables {
+		if response.tables[idx], err = deserializeTable(r); err != nil {
+			return nil, err
+		}
+	}
 	return response, nil
 }
-
-func readTableBuf(r io.Reader) (bytes.Buffer, error) {
-    var b bytes.Buffer
-    ttlLength, err := readInt(r)
-    if err != nil {
-        return b, err
-    }
-    // This copy should be unnecessary; unclear how to create
-    // a set of Buffers as views into the data underlying r.
-    var data []byte = make([]byte, ttlLength)
-    _, err = r.Read(data)
-    if err != nil {
-        return b, err
-    }
-    return *bytes.NewBuffer(data), nil
-}
-
-
-//
-// Folowing to end of file is dead table deser code from a
-// previous arrangement of the api; still useful to doc some
-// of the wire protocol, though.
-//
 
 func deserializeTable(r io.Reader) (t Table, err error) {
 	var errTable Table
@@ -312,7 +284,6 @@ func deserializeTable(r io.Reader) (t Table, err error) {
 	if err != nil {
 		return errTable, err
 	}
-	fmt.Printf("\tttlLength: %v, metaLength: %v\n", ttlLength, metaLength)
 
 	t.statusCode, err = readByte(r)
 	if err != nil {
@@ -326,7 +297,7 @@ func deserializeTable(r io.Reader) (t Table, err error) {
 
 	// column type "array" and column name "array" are not
 	// length prefixed arrays. they are really just columnCount
-	// len sequences of bytes (col. type) and strings (col names).
+	// len sequences of bytes (types) and strings (names).
 	var i int16
 	for i = 0; i < t.columnCount; i++ {
 		ct, err := readByte(r)
@@ -349,60 +320,18 @@ func deserializeTable(r io.Reader) (t Table, err error) {
 		return errTable, err
 	}
 
-	t.rows = make([]Row, t.rowCount)
-	for idx, _ := range t.rows {
-		_, err := readInt(r)
-		if err != nil {
-			return errTable, err
-		}
-		row, err := deserializeRow(t.columnTypes, r)
-		if err != nil {
-			return errTable, err
-		}
-		t.rows[idx] = row
-	}
+	// the total row data byte count is:
+	//    ttlLength
+	//  - 4 byte metaLength field
+	//  - metaLength
+	//  - 4 byte row count field
+	var tableByteCount int64 = int64(ttlLength - metaLength - 8)
+
+	// OPTIMIZE? Could avoid a possibly large copy here by
+	// initializing buf to r[Pos():tableByteCount]. Unsure
+	// if that way lies madness or cleverness. For now, suck
+	// up the copy. Maybe in the future change this method
+	// to take a buffer instead of a reader?
+	io.CopyN(&t.rows, r, tableByteCount)
 	return t, nil
 }
-
-func deserializeRow(types []int8, r io.Reader) (Row, error) {
-	var row Row
-	row.vals = make([]interface{}, len(types))
-	for idx, t := range types {
-		val, err := deserializeType(t, r)
-		if err != nil {
-			return row, err
-		}
-		row.vals[idx] = val
-	}
-	return row, nil
-}
-
-func deserializeType(volttype int8, r io.Reader) (interface{}, error) {
-	switch volttype {
-	case vt_BOOL:
-		return readBoolean(r)
-	case vt_SHORT:
-		return readShort(r)
-	case vt_INT:
-		return readInt(r)
-	case vt_LONG:
-		return readLong(r)
-	case vt_FLOAT:
-		return readFloat(r)
-	case vt_STRING:
-		return readString(r)
-	case vt_TIMESTAMP:
-		// TODO: need timestamps...
-		return readLong(r)
-	case vt_TABLE:
-		panic("Can not deserialize table via deserializeType")
-	case vt_DECIMAL:
-		panic("Decimal type is not supported.")
-	case vt_VARBIN:
-		panic("VARBINARY type is not supported.")
-	default:
-		panic("Unknown type in deserialize type")
-	}
-	panic("Unreachable.")
-}
-
