@@ -57,3 +57,11 @@ Row deserialization could be substantially more flexible. It would be nice
 to allow tagged field names to specify columns (instead of requiring the
 struct fields to be in column-order).
 
+## Using the go tool
+
+cd $GOPATH
+go build github.com/rbetts/voltdbgo/voltdb
+go test github.com/rbetts/voltdbgo/voltdb
+go build src/github.com/rbetts/voltdbgo/example/voter.go
+./voter
+

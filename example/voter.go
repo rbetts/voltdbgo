@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/rbetts/voltdbclient/voltdb"
+	"github.com/rbetts/voltdbgo/voltdb"
 	"log"
 )
 
