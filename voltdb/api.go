@@ -106,6 +106,26 @@ type Response struct {
 	tables          []Table
 }
 
+func (rsp *Response) Status() int {
+    return int(rsp.status)
+}
+
+func (rsp *Response) StatusString() string {
+    return rsp.statusString
+}
+
+func (rsp *Response) AppStatus() int {
+    return int(rsp.appStatus)
+}
+
+func (rsp *Response) AppStatusString() string {
+    return rsp.appStatusString
+}
+
+func (rsp *Response) ClusterLatency() int {
+    return int(rsp.clusterLatency)
+}
+
 func (rsp *Response) ResultSets() []Table {
 	return rsp.tables
 }
