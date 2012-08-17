@@ -24,6 +24,7 @@ func main() {
 		log.Fatalf("Connection error %v\n", err)
 	}
 	printResults(volt)
+	volt.Close()
 }
 
 func printResults(volt *voltdb.Conn) {

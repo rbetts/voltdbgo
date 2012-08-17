@@ -55,12 +55,28 @@ func (conn *Conn) GoString() string {
 	return "uninitialized"
 }
 
+// Close a connection if open. A Conn, once closed, has no further use.
+// To open a new connection, use NewConnection.
+func (conn *Conn) Close() error {
+	var err error = nil
+	if conn.tcpConn != nil {
+		err = conn.tcpConn.Close()
+	}
+	conn.tcpConn = nil
+	conn.connData = nil
+	return err
+}
+
 // Call invokes the procedure 'procedure' with parameter values 'params'
-// and returns a pointer to the associated Response.
+// and returns a pointer to the received Response.
 func (conn *Conn) Call(procedure string, params ...interface{}) (*Response, error) {
 	var call bytes.Buffer
 	var resp *bytes.Buffer
 	var err error
+
+	if conn.tcpConn == nil {
+		return nil, fmt.Errorf("Can not call procedure on closed Conn.")
+	}
 
 	// Use 0 for handle; it's not necessary in pure sync client.
 	if call, err = serializeCall(procedure, 0, params); err != nil {
