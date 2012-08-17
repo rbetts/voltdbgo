@@ -23,6 +23,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Connection error %v\n", err)
 	}
+	if !volt.TestConnection() {
+		log.Fatalf("Connection error: failed to ping VoltDB database.")
+	}
 	printResults(volt)
 	volt.Close()
 }

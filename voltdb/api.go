@@ -45,16 +45,6 @@ func NewConnection(user string, passwd string, hostAndPort string) (*Conn, error
 	return conn, nil
 }
 
-// GoString provides a default printable format for Conn.
-func (conn *Conn) GoString() string {
-	if conn.connData != nil {
-		return fmt.Sprintf("hostId:%v, connId:%v, leaderAddr:%v buildString:%v",
-			conn.connData.hostId, conn.connData.connId,
-			conn.connData.leaderAddr, conn.connData.buildString)
-	}
-	return "uninitialized"
-}
-
 // Close a connection if open. A Conn, once closed, has no further use.
 // To open a new connection, use NewConnection.
 func (conn *Conn) Close() error {
@@ -65,6 +55,28 @@ func (conn *Conn) Close() error {
 	conn.tcpConn = nil
 	conn.connData = nil
 	return err
+}
+
+// GoString provides a default printable format for Conn.
+func (conn *Conn) GoString() string {
+	if conn.connData != nil {
+		return fmt.Sprintf("hostId:%v, connId:%v, leaderAddr:%v buildString:%v",
+			conn.connData.hostId, conn.connData.connId,
+			conn.connData.leaderAddr, conn.connData.buildString)
+	}
+	return "uninitialized"
+}
+
+// Ping the database for liveness.
+func (conn *Conn) TestConnection() bool {
+	if conn.tcpConn == nil {
+		return false
+	}
+	rsp, err := conn.Call("@Ping")
+	if err != nil {
+		return false
+	}
+	return rsp.status == SUCCESS
 }
 
 // Call invokes the procedure 'procedure' with parameter values 'params'
@@ -106,24 +118,33 @@ type Response struct {
 	tables          []Table
 }
 
+// Response status codes
+const (
+	SUCCESS            = 1
+	USER_ABORT         = -1
+	GRACEFUL_FAILURE   = -2
+	UNEXPECTED_FAILURE = -3
+	CONNECTION_LOST    = -4
+)
+
 func (rsp *Response) Status() int {
-    return int(rsp.status)
+	return int(rsp.status)
 }
 
 func (rsp *Response) StatusString() string {
-    return rsp.statusString
+	return rsp.statusString
 }
 
 func (rsp *Response) AppStatus() int {
-    return int(rsp.appStatus)
+	return int(rsp.appStatus)
 }
 
 func (rsp *Response) AppStatusString() string {
-    return rsp.appStatusString
+	return rsp.appStatusString
 }
 
 func (rsp *Response) ClusterLatency() int {
-    return int(rsp.clusterLatency)
+	return int(rsp.clusterLatency)
 }
 
 func (rsp *Response) ResultSets() []Table {

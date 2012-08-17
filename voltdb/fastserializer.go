@@ -24,12 +24,6 @@ const (
 	vt_VARBIN    int8 = 25  // varbinary (int)(bytes)
 )
 
-// SUCCESS = 1
-// USER_ABORT = -1
-// GRACEFUL_FAILURE = -2
-// UNEXPECTED_FAILURE = -3
-// CONNECTION_LOST = -4
-
 var order = binary.BigEndian
 
 // protoVersion is the implemented VoltDB wireprotocol version.
