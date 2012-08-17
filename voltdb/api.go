@@ -121,6 +121,7 @@ func (rsp *Response) GoString() string {
 		rsp.clusterLatency, rsp.appStatus, rsp.appStatusString)
 }
 
+// Table represents a single result set for a stored procedure invocation.
 type Table struct {
 	statusCode  int8
 	columnCount int16
@@ -136,8 +137,28 @@ func (table *Table) GoString() string {
 		table.rowCount)
 }
 
+func (table *Table) StatusCode() int {
+	return int(table.statusCode)
+}
+
+func (table *Table) ColumnCount() int {
+	return int(table.columnCount)
+}
+
+func (table *Table) ColumnTypes() []int8 {
+	rv := make([]int8, 0)
+	rv = append(rv, table.columnTypes...)
+	return rv
+}
+
+func (table *Table) ColumnNames() []string {
+	rv := make([]string, 0)
+	rv = append(rv, table.columnNames...)
+	return rv
+}
+
 // Rowcount returns the number of rows returned by the server for this table.
-func (table *Table) Rowcount() int {
+func (table *Table) RowCount() int {
 	return int(table.rowCount)
 }
 
