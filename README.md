@@ -43,7 +43,6 @@ However, there are several serializations that are not yet implemented.
 There are missing api methods.
 
  * There is no way to reset the table iterator.
- * Several Conn, Response, and Table fields are unexported without accessors.
 
 
 There are missing components expected for a production client: 
