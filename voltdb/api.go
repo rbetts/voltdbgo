@@ -76,7 +76,7 @@ func (conn *Conn) TestConnection() bool {
 	if err != nil {
 		return false
 	}
-	return rsp.status == SUCCESS
+	return rsp.Status() == SUCCESS
 }
 
 // Call invokes the procedure 'procedure' with parameter values 'params'
@@ -119,16 +119,35 @@ type Response struct {
 }
 
 // Response status codes
+type Status int
+
 const (
-	SUCCESS            = 1
-	USER_ABORT         = -1
-	GRACEFUL_FAILURE   = -2
-	UNEXPECTED_FAILURE = -3
-	CONNECTION_LOST    = -4
+	SUCCESS            Status = 1
+	USER_ABORT         Status = -1
+	GRACEFUL_FAILURE   Status = -2
+	UNEXPECTED_FAILURE Status = -3
+	CONNECTION_LOST    Status = -4
 )
 
-func (rsp *Response) Status() int {
-	return int(rsp.status)
+func (s Status) String() string {
+	if s == SUCCESS {
+		return "SUCCESS"
+	} else if s == USER_ABORT {
+		return "USER ABORT"
+	} else if s == GRACEFUL_FAILURE {
+		return "GRACEFUL FAILURE"
+	} else if s == UNEXPECTED_FAILURE {
+		return "UNEXPECTED FAILURE"
+	} else if s == CONNECTION_LOST {
+		return "CONNECTION LOST"
+	} else {
+		panic(fmt.Sprintf("Invalid status code: %d", int(s)))
+	}
+	return "unreachable"
+}
+
+func (rsp *Response) Status() Status {
+	return Status(rsp.status)
 }
 
 func (rsp *Response) StatusString() string {
