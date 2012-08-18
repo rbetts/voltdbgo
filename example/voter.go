@@ -9,15 +9,13 @@ import (
 	"github.com/rbetts/voltdbgo/voltdb"
 	"log"
 	"math/rand"
-    "os"
 	"time"
-    "runtime/pprof"
 )
 
 var ttlContestants = 6
 var contestants = "Andy,Bob,Cathy,Doug,Erik,Greg"
 var voterGoroutines = 8
-var votingDuration time.Duration = 100 * time.Second
+var votingDuration time.Duration = 15 * time.Second
 
 // ScalarResult is used to read scalar stored procedures results.
 type ScalarResult struct {
@@ -34,15 +32,8 @@ func main() {
 		log.Fatalf("Connection error: failed to ping VoltDB database.")
 	}
 
-    f, err := os.Create("/Users/rbetts/voterprof")
-    if err != nil {
-        log.Fatal(err)
-    }
-
 	initialize(volt)
-    pprof.StartCPUProfile(f)
-    vote();
-    pprof.StopCPUProfile()
+	vote()
 	printResults(volt)
 }
 
@@ -58,7 +49,7 @@ func initialize(volt *voltdb.Conn) {
 		fmt.Printf("Initialized %d contestants.\n", rs.Result)
 	} else {
 		log.Fatalf("Failed to initialize %#v.\n", rsp)
-    }
+	}
 }
 
 // vote starts voterGoroutine number votes loops and returns when
@@ -70,15 +61,15 @@ func vote() {
 		joiners = append(joiners, joinchan)
 		go placeVotes(joinchan)
 	}
-    var totalVotes = 0
+	var totalVotes = 0
 	for v, join := range joiners {
 		votes := <-join
-        totalVotes += votes
+		totalVotes += votes
 		fmt.Printf("Voter %v finished and placed %v votes.\n", v, votes)
 	}
-    fmt.Printf("Generated %v votes in %v seconds (%0.0f votes/second)\n",
-        totalVotes, votingDuration.Seconds(),
-        float64(totalVotes)/votingDuration.Seconds())
+	fmt.Printf("Generated %v votes in %v seconds (%0.0f votes/second)\n",
+		totalVotes, votingDuration.Seconds(),
+		float64(totalVotes)/votingDuration.Seconds())
 	return
 }
 
@@ -108,7 +99,7 @@ func placeVotes(join chan int) {
 				log.Fatalf("Error voting. %v\n", err)
 			}
 			if rsp.Status() == voltdb.SUCCESS {
-                placedVotes++
+				placedVotes++
 			} else {
 				fmt.Printf("Vote failed %#v\n", rsp)
 			}
@@ -118,19 +109,19 @@ func placeVotes(join chan int) {
 
 // printResults displays the current vote tally for each contestant.
 func printResults(volt *voltdb.Conn) {
-    type ResultsRow struct {
-        Contestant string
-        Id         int
-        Votes      int
-    }
+	type ResultsRow struct {
+		Contestant string
+		Id         int
+		Votes      int
+	}
 	var row ResultsRow
-    fmt.Printf("\nCurrent results:\n")
+	fmt.Printf("\nCurrent results:\n")
 	response, _ := volt.Call("Results")
 	table := response.Table(0)
 	for table.HasNext() {
 		if err := table.Next(&row); err != nil {
 			log.Fatalf("Table iteration error %v\n", err)
 		}
-        fmt.Printf("%v\t%v\t%v\n", row.Contestant, row.Id, row.Votes)
+		fmt.Printf("%v\t%v\t%v\n", row.Contestant, row.Id, row.Votes)
 	}
 }
