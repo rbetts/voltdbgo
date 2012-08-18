@@ -161,14 +161,13 @@ func serializeCall(proc string, ud int64, params []interface{}) (msg bytes.Buffe
 }
 
 func serializeParams(params []interface{}) (msg bytes.Buffer, err error) {
-	// parameter count      short
+	// parameter_count short
 	// (type byte, parameter)*
 	if err = writeShort(&msg, int16(len(params))); err != nil {
 		return
 	}
 	for _, val := range params {
 		if err = marshalParam(&msg, val); err != nil {
-			fmt.Printf("\tMarshalling: %v\n", val)
 			return
 		}
 	}
@@ -180,7 +179,6 @@ func marshalParam(buf io.Writer, param interface{}) (err error) {
 	if !v.IsValid() {
 		return errors.New("Can not encode value.")
 	}
-
 	switch v.Kind() {
 	case reflect.Bool:
 		x := v.Bool()
@@ -198,7 +196,7 @@ func marshalParam(buf io.Writer, param interface{}) (err error) {
 		x := v.Int()
 		writeByte(buf, vt_INT)
 		err = writeInt(buf, int32(x))
-	case reflect.Int64:
+	case reflect.Int, reflect.Int64:
 		x := v.Int()
 		writeByte(buf, vt_LONG)
 		err = writeLong(buf, int64(x))
@@ -210,6 +208,8 @@ func marshalParam(buf io.Writer, param interface{}) (err error) {
 		x := v.String()
 		writeByte(buf, vt_STRING)
 		err = writeString(buf, x)
+	default:
+		panic(fmt.Sprintf("Can't marshal %v-type parameters", v.Kind()))
 	}
 	return
 }
@@ -252,7 +252,6 @@ func deserializeCallResponse(r io.Reader) (response *Response, err error) {
 			return nil, err
 		}
 		if response.exceptionLength > 0 {
-			fmt.Printf("Received exception of length: %d\n", response.exceptionLength)
 			// TODO: implement exception deserialization.
 			ignored := make([]byte, response.exceptionLength)
 			if _, err = io.ReadFull(r, ignored); err != nil {
