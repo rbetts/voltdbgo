@@ -5,17 +5,21 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"github.com/rbetts/voltdbgo/voltdb"
 	"log"
 	"math/rand"
+	"os"
+	"runtime/pprof"
 	"time"
 )
 
 var ttlContestants = 6
 var contestants = "Andy,Bob,Cathy,Doug,Erik,Greg"
 var voterGoroutines = 8
-var votingDuration time.Duration = 15 * time.Second
+var votingDuration = 15 * time.Second
+var cpuprofile = ""
 
 // ScalarResult is used to read scalar stored procedures results.
 type ScalarResult struct {
@@ -23,18 +27,43 @@ type ScalarResult struct {
 }
 
 func main() {
-	volt, err := voltdb.NewConnection("username", "", "localhost:21212")
+	flag.DurationVar(&votingDuration, "duration", 15*time.Second, "seconds to execute")
+	flag.StringVar(&cpuprofile, "cpuprofile", "", "name of profile file to write")
+	flag.IntVar(&voterGoroutines, "threads", 8, "number of concurrent voting goroutines")
+	flag.Parse()
+
+	volt := connectOrDie()
 	defer volt.Close()
+	initialize(volt)
+	vote()
+	printResults(volt)
+}
+
+func setupProfiler() {
+	if cpuprofile != "" {
+		f, err := os.Create(cpuprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+	}
+}
+
+func teardownProfiler() {
+	if cpuprofile != "" {
+		pprof.StopCPUProfile()
+	}
+}
+
+func connectOrDie() *voltdb.Conn {
+	volt, err := voltdb.NewConnection("username", "", "localhost:21212")
 	if err != nil {
 		log.Fatalf("Connection error %v\n", err)
 	}
 	if !volt.TestConnection() {
 		log.Fatalf("Connection error: failed to ping VoltDB database.")
 	}
-
-	initialize(volt)
-	vote()
-	printResults(volt)
+	return volt
 }
 
 // Add contestants to the database if necessary
@@ -55,6 +84,9 @@ func initialize(volt *voltdb.Conn) {
 // vote starts voterGoroutine number votes loops and returns when
 // they have all run to conclusion.
 func vote() {
+	setupProfiler()
+	defer teardownProfiler()
+
 	var joiners = make([]chan int, 0)
 	for i := 0; i < voterGoroutines; i++ {
 		var joinchan = make(chan int)
