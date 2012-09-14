@@ -19,13 +19,16 @@ import (
 // relatively cheap to copy (the associated user data is copied
 // reference).
 func (conn *Conn) writeMessage(buf bytes.Buffer) error {
-	length := buf.Len() + 1 // length includes proto version.
-	var hdr bytes.Buffer
-	writeInt(&hdr, int32(length))
-	writeProtoVersion(&hdr)
-	io.Copy(conn.tcpConn, &hdr)
-	io.Copy(conn.tcpConn, &buf)
-	return nil // TODO: obviously wrong
+	// length includes protocol version.
+	length := buf.Len() + 1
+	var netmsg bytes.Buffer
+	writeInt(&netmsg, int32(length))
+	writeProtoVersion(&netmsg)
+	// 1 copy + 1 n/w write benchmarks faster than 2 n/w writes.
+	io.Copy(&netmsg, &buf)
+	io.Copy(conn.tcpConn, &netmsg)
+	// TODO: obviously wrong
+	return nil
 }
 
 // readMessageHdr reads the standard wireprotocol header.
@@ -35,12 +38,7 @@ func (conn *Conn) readMessageHdr() (size int32, err error) {
 	if err != nil {
 		return
 	}
-	// Version Byte 1
-	// TODO: error on incorrect version.
-	_, err = readByte(conn.tcpConn)
-
-	// size includes the protocol version.
-	return (size - 1), nil
+	return (size), nil
 }
 
 // readLoginResponse parses the login response message.
@@ -54,6 +52,13 @@ func (conn *Conn) readMessage() (*bytes.Buffer, error) {
 		return nil, err
 	}
 	buf := bytes.NewBuffer(data)
+
+	// Version Byte 1
+	// TODO: error on incorrect version.
+	if _, err = readByte(buf); err != nil {
+		return nil, err
+	}
+
 	return buf, nil
 }
 
