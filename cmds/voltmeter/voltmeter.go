@@ -30,6 +30,10 @@ type StatsProcedure struct {
 	Failures         int64
 }
 
+func (p StatsProcedure) weight() int64 {
+	return p.AvgExecTime * p.TimedInvocations
+}
+
 // ProcedureCost summarizes average execution by procedure
 type ProcedureCost struct {
 	Procedure        string
@@ -40,23 +44,19 @@ type ProcedureCost struct {
 
 func (p ProcedureCost) String() string {
 	return fmt.Sprintf("Procedure:%v, Invocations:%v, Timed:%v, AvgExecution:%v, Cost:%#v",
-		p.Procedure, p.Invocations, p.TimedInvocations, p.AvgExecTime, (p.TimedInvocations * p.AvgExecTime))
+		p.Procedure, p.Invocations, p.TimedInvocations, p.AvgExecTime, p.weight())
+}
+
+func (p ProcedureCost) weight() int64 {
+	return p.AvgExecTime * p.TimedInvocations
 }
 
 // ProcedureCost allows sorting ProcedureCost by weighted execution time.
 type ProcedureCostList []ProcedureCost
 
-func (p ProcedureCostList) Swap(i, j int) {
-	p[i], p[j] = p[j], p[i]
-}
-
-func (p ProcedureCostList) Len() int {
-	return len(p)
-}
-
-func (p ProcedureCostList) Less(i, j int) bool {
-	return (p[i].AvgExecTime * p[i].TimedInvocations) > (p[j].AvgExecTime * p[j].TimedInvocations)
-}
+func (p ProcedureCostList) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func (p ProcedureCostList) Len() int           { return len(p) }
+func (p ProcedureCostList) Less(i, j int) bool { return p[i].weight() > p[j].weight() }
 
 func sortProcedureCostMap(m map[string]ProcedureCost) ProcedureCostList {
 	sortedStats := make(ProcedureCostList, len(m))
@@ -104,9 +104,7 @@ func dumpProcedureCost(volt *voltdb.Conn) {
 		}
 		if exists, ok := statsByProcedure[row.Procedure]; ok == true {
 			// weighted average of exec times by timedInvocations
-			avg := ((exists.AvgExecTime * exists.TimedInvocations) +
-				(row.AvgExecTime * row.TimedInvocations)) /
-				(exists.TimedInvocations + row.TimedInvocations)
+			avg := (exists.weight() + row.weight()) / (exists.TimedInvocations + row.TimedInvocations)
 			exists.Invocations += row.Invocations
 			exists.TimedInvocations += row.TimedInvocations
 			exists.AvgExecTime = avg
@@ -121,7 +119,11 @@ func dumpProcedureCost(volt *voltdb.Conn) {
 	}
 
 	sorted := sortProcedureCostMap(statsByProcedure)
-	for idx, stat := range sorted {
-		fmt.Printf("(%v) %v\n", idx, stat)
+    var ttlWeight int64 = 0
+    for _, stat := range sorted {
+        ttlWeight += stat.weight()
+    }
+	for _, stat := range sorted {
+		fmt.Printf("%0.1f%% %v\n",float64(stat.weight())/float64(ttlWeight) * 100, stat)
 	}
 }
