@@ -58,9 +58,9 @@ struct fields to be in column-order).
 
 ## Using the go tool
 
-cd $GOPATH
-go build github.com/rbetts/voltdbgo/voltdb
-go test github.com/rbetts/voltdbgo/voltdb
-go build src/github.com/rbetts/voltdbgo/example/voter.go
-./voter
+    cd $GOPATH
+    go build github.com/rbetts/voltdbgo/voltdb
+    go test github.com/rbetts/voltdbgo/voltdb
+    go build src/github.com/rbetts/voltdbgo/example/voter.go
+    ./voter
 
