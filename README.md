@@ -14,18 +14,23 @@ See below for some of the more important missing parts.
 The driver connects to a running VoltDB database node and calls procedures.
 The simplest example, omitting correct error handling, is:
 
+func main() {
     volt, _ := voltdb.NewConnection("username", "", "localhost:21212")
-    response, _ := volt.Call("ProcedureName", "param1", param2, ...)
+    response, _ := volt.Call("@AdHoc", "select * from store order by Key limit 3;");
     type Row struct {
-        Attr1 string
-        Attr2 int
-     }
-     var row Row
-     for response.Table(0).HasNext() {
-         table.Next(&row)
-         fmt.Printf("Row: %v %v\n", row.Attr1, row.Attr2)
-     }
+        Key string
+        Value string
+    }
+    var row Row
+    for response.Table(0).HasNext() {
+        response.Table(0).Next(&row)
+        fmt.Printf("Row: %v %v\n", row.Key, row.Value)
+    }
+}
 
+## Examples
+
+There are a few examples in github.com/rbetts/voltdbgo/cmds.
 
 ## Missing
 
@@ -38,12 +43,11 @@ However, there are several serializations that are not yet implemented.
  * DECIMAL not supported
  * Creation of serialized VoltTables is not supported.
  * Arrays as stored procedure parameters not supported.
- * SQL NULL is not uniformly supported.
+ * SQL NULL is not supported.
 
 There are missing api methods.
 
  * There is no way to reset the table iterator.
-
 
 There are missing components expected for a production client: 
 
@@ -56,11 +60,4 @@ Row deserialization could be substantially more flexible. It would be nice
 to allow tagged field names to specify columns (instead of requiring the
 struct fields to be in column-order).
 
-## Using the go tool
-
-cd $GOPATH
-go build github.com/rbetts/voltdbgo/voltdb
-go test github.com/rbetts/voltdbgo/voltdb
-go build src/github.com/rbetts/voltdbgo/example/voter.go
-./voter
 
