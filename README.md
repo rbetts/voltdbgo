@@ -14,19 +14,19 @@ See below for some of the more important missing parts.
 The driver connects to a running VoltDB database node and calls procedures.
 The simplest example, omitting correct error handling, is:
 
-func main() {
-    volt, _ := voltdb.NewConnection("username", "", "localhost:21212")
-    response, _ := volt.Call("@AdHoc", "select * from store order by Key limit 3;");
-    type Row struct {
-        Key string
-        Value string
+    func main() {
+        volt, _ := voltdb.NewConnection("username", "", "localhost:21212")
+        response, _ := volt.Call("@AdHoc", "select * from store order by Key limit 3;");
+        type Row struct {
+            Key string
+            Value string
+        }
+        var row Row
+        for response.Table(0).HasNext() {
+            response.Table(0).Next(&row)
+            fmt.Printf("Row: %v %v\n", row.Key, row.Value)
+        }
     }
-    var row Row
-    for response.Table(0).HasNext() {
-        response.Table(0).Next(&row)
-        fmt.Printf("Row: %v %v\n", row.Key, row.Value)
-    }
-}
 
 ## Examples
 
