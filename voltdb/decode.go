@@ -60,7 +60,8 @@ func (table *Table) next(v interface{}) error {
 			val, _ := readString(r)
 			structField.SetString(val)
 		case vt_TIMESTAMP:
-			panic("Can not deserialize timestamps yet.")
+			val, _ := readTimestamp(r)
+			structField.Set(reflect.ValueOf(val))
 		case vt_TABLE:
 			panic("Can not deserialize embedded tables.")
 		case vt_DECIMAL:

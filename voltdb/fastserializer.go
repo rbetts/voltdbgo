@@ -3,6 +3,7 @@ package voltdb
 import (
 	"encoding/binary"
 	"io"
+	"time"
 )
 
 // package private methods that perform voltdb compatible
@@ -143,6 +144,23 @@ func readLong(r io.Reader) (int64, error) {
 	}
 	result := order.Uint64(bs)
 	return int64(result), nil
+}
+
+func readTimestamp(r io.Reader) (time.Time, error) {
+	nanoSeconds, err := readLong(r)
+	if nanoSeconds > 0 {
+		ts := time.Unix(0, nanoSeconds*int64(time.Microsecond))
+		return ts.Round(time.Microsecond), err
+	}
+	return time.Time{}, err
+}
+
+func writeTimestamp(w io.Writer, t time.Time) (err error) {
+	nanoSeconds := t.Round(time.Microsecond).UnixNano()
+	if t.IsZero() {
+		nanoSeconds = 0
+	}
+	return writeLong(w, nanoSeconds/int64(time.Microsecond))
 }
 
 func writeFloat(w io.Writer, d float64) error {

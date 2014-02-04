@@ -8,6 +8,7 @@ import (
 	"io"
 	"reflect"
 	"runtime"
+	"time"
 )
 
 // io.go includes protocol-level de/serialization code. For
@@ -213,6 +214,13 @@ func marshalParam(buf io.Writer, param interface{}) (err error) {
 		x := v.String()
 		writeByte(buf, vt_STRING)
 		err = writeString(buf, x)
+	case reflect.Struct:
+		if t, ok := v.Interface().(time.Time); ok {
+			writeByte(buf, vt_TIMESTAMP)
+			writeTimestamp(buf, t)
+		} else {
+			panic("Can't marshal struct-type parameters")
+		}
 	default:
 		panic(fmt.Sprintf("Can't marshal %v-type parameters", v.Kind()))
 	}

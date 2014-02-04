@@ -3,6 +3,7 @@ package voltdb
 import (
 	"bytes"
 	"testing"
+	"time"
 )
 
 func TestWriteByte(t *testing.T) {
@@ -120,6 +121,15 @@ func TestRoundTripString(t *testing.T) {
 	}
 }
 
+func TestRoundTripNullTimestamp(t *testing.T) {
+	var b bytes.Buffer
+	writeTimestamp(&b, time.Time{})
+	result, _ := readTimestamp(&b)
+	if !result.IsZero() {
+		t.Error("timestamp round trip failed. Want zero-value have non-zero")
+	}
+}
+
 func TestReflection(t *testing.T) {
 	var b bytes.Buffer
 	var expInt8 int8 = 5
@@ -143,5 +153,17 @@ func TestReflection(t *testing.T) {
 	rString, _ := readString(&b)
 	if rString != expString {
 		t.Errorf("string reflection failed. Want %s have %s", expString, rString)
+	}
+
+	b.Reset()
+	var expTimestamp time.Time = time.Now().Round(time.Microsecond)
+	marshalParam(&b, expTimestamp)
+	rVtTimestamp, _ := readByte(&b) // volttype
+	if rVtTimestamp != vt_TIMESTAMP {
+		t.Errorf("reflect failed to write volttype timestamp")
+	}
+	rTimestamp, _ := readTimestamp(&b)
+	if rTimestamp != expTimestamp {
+		t.Errorf("timestamp reflection failed. Want %v have %v", expTimestamp, rTimestamp)
 	}
 }
