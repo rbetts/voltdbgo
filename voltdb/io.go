@@ -75,7 +75,7 @@ func serializeLoginMessage(user string, passwd string) (msg bytes.Buffer, err er
 	if err != nil {
 		return
 	}
-	err = writeByteString(&msg, shabytes)
+	err = writePasswordBytes(&msg, shabytes)
 	if err != nil {
 		return
 	}
