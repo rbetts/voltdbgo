@@ -200,6 +200,13 @@ func readStringArray(r io.Reader) ([]string, error) {
 	return arr, nil
 }
 
+// The login message password is written as a raw 20 bytes
+// without a length prefix.
+func writePasswordBytes(w io.Writer, d []byte) error {
+	_, err := w.Write(d)
+	return err
+}
+
 func writeByteString(w io.Writer, d []byte) error {
 	writeInt(w, int32(len(d)))
 	_, err := w.Write(d)
