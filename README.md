@@ -39,7 +39,6 @@ However, there are several serializations that are not yet implemented.
 
  * Exception deserialization in responses not supported.
  * VARBINARY not supported
- * TIMESTAMP not supported
  * DECIMAL not supported
  * Creation of serialized VoltTables is not supported.
  * Arrays as stored procedure parameters not supported.
