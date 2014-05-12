@@ -92,6 +92,18 @@ func TestWriteFloat(t *testing.T) {
 	}
 }
 
+func TestRoundTripFloat(t *testing.T) {
+	testVals := [...]float64{-100, -1, 0, 1, 100, 60.1798012160534}
+	for _, val := range testVals {
+		var b bytes.Buffer
+		writeFloat(&b, val)
+		r, _ := readFloat(&b)
+		if val != r {
+			t.Errorf("Expected %v have %v", val, r)
+		}
+	}
+}
+
 // only tests a single pure-ascii string
 func TestWriteString(t *testing.T) {
 	var b bytes.Buffer
