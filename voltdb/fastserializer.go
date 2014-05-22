@@ -3,6 +3,7 @@ package voltdb
 import (
 	"encoding/binary"
 	"io"
+	"math"
 	"time"
 )
 
@@ -166,7 +167,7 @@ func writeTimestamp(w io.Writer, t time.Time) (err error) {
 func writeFloat(w io.Writer, d float64) error {
 	var b [8]byte
 	bs := b[:8]
-	order.PutUint64(bs, uint64(d))
+	order.PutUint64(bs, math.Float64bits(d))
 	_, err := w.Write(bs)
 	return err
 }
@@ -179,7 +180,7 @@ func readFloat(r io.Reader) (float64, error) {
 		return 0, err
 	}
 	result := order.Uint64(bs)
-	return float64(result), nil
+	return math.Float64frombits(result), nil
 }
 
 func writeString(w io.Writer, d string) error {
