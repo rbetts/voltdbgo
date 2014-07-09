@@ -195,6 +195,10 @@ func readString(r io.Reader) (result string, err error) {
 	if err != nil {
 		return
 	}
+	if length == -1 {
+		// NULL string not supported, return zero value
+		return
+	}
 	bs := make([]byte, length)
 	_, err = r.Read(bs)
 	if err != nil {
