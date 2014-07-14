@@ -149,7 +149,7 @@ func readLong(r io.Reader) (int64, error) {
 
 func readTimestamp(r io.Reader) (time.Time, error) {
 	nanoSeconds, err := readLong(r)
-	if nanoSeconds > 0 {
+	if nanoSeconds != 0 {
 		ts := time.Unix(0, nanoSeconds*int64(time.Microsecond))
 		return ts.Round(time.Microsecond), err
 	}
