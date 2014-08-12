@@ -142,6 +142,17 @@ func TestRoundTripNullTimestamp(t *testing.T) {
 	}
 }
 
+func TestRoundTripNegativeTimestamp(t *testing.T) {
+	ts := time.Unix(-10000, 0)
+
+	var b bytes.Buffer
+	writeTimestamp(&b, ts)
+	result, _ := readTimestamp(&b)
+	if result != ts {
+		t.Errorf("timestamp round trip failed, expected %s got %s", ts.String(), result.String())
+	}
+}
+
 func TestReflection(t *testing.T) {
 	var b bytes.Buffer
 	var expInt8 int8 = 5
