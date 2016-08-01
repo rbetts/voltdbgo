@@ -1,5 +1,8 @@
 # voltdbclient
 
+** DEPRECATED. VoltDB produced an official driver to replace this work:**
+[official voltdb voltdb-client-go driver](https://github.com/VoltDB/voltdb-client-go)
+
 VoltDB driver for Google go (golang)
 
 See api.go for usage hints. There are some client examples in the
