@@ -27,9 +27,13 @@ func (conn *Conn) writeMessage(buf bytes.Buffer) error {
 	writeProtoVersion(&netmsg)
 	// 1 copy + 1 n/w write benchmarks faster than 2 n/w writes.
 	io.Copy(&netmsg, &buf)
-	io.Copy(conn.tcpConn, &netmsg)
-	// TODO: obviously wrong
-	return nil
+
+	// Reset of write deadline is not necessary because all
+	// writes should set the deadline.
+	conn.tcpConn.SetWriteDeadline(time.Now().Add(writeWait))
+
+	_, err := io.Copy(conn.tcpConn, &netmsg)
+	return err
 }
 
 // readMessageHdr reads the standard wireprotocol header.
@@ -84,6 +88,7 @@ func serializeLoginMessage(user string, passwd string) (msg bytes.Buffer, err er
 }
 
 func (conn *Conn) readLoginResponse() (*connectionData, error) {
+	conn.tcpConn.SetReadDeadline(time.Now().Add(loginResponseWait))
 	buf, err := conn.readMessage()
 	if err != nil {
 		return nil, err

@@ -4,12 +4,22 @@ import (
 	"bytes"
 	"fmt"
 	"net"
+	"time"
+)
+
+var (
+	connectWait       = 5 * time.Second // Deadline for TCP dialer
+	callResponseWait  = 2 * time.Minute // Deadline for reading response of procedure call
+	pingResponseWait  = time.Second     // Deadline for ping
+	loginResponseWait = time.Second     // Deadline for login response
+	writeWait         = time.Second     // Deadline for writeMessage
 )
 
 // Conn is a single connection to a single node of a VoltDB database
 type Conn struct {
-	tcpConn  *net.TCPConn
-	connData *connectionData
+	tcpConn      net.Conn
+	connData     *connectionData
+	callDeadline time.Time
 }
 
 // connectionData are the values returned by a successful login.
@@ -24,13 +34,9 @@ type connectionData struct {
 func NewConnection(user string, passwd string, hostAndPort string) (*Conn, error) {
 	var conn = new(Conn)
 	var err error
-	var raddr *net.TCPAddr
 	var login bytes.Buffer
 
-	if raddr, err = net.ResolveTCPAddr("tcp", hostAndPort); err != nil {
-		return nil, fmt.Errorf("Error resolving %v.", hostAndPort)
-	}
-	if conn.tcpConn, err = net.DialTCP("tcp", nil, raddr); err != nil {
+	if conn.tcpConn, err = net.DialTimeout("tcp", hostAndPort, connectWait); err != nil {
 		return nil, err
 	}
 	if login, err = serializeLoginMessage(user, passwd); err != nil {
@@ -72,7 +78,8 @@ func (conn *Conn) TestConnection() bool {
 	if conn.tcpConn == nil {
 		return false
 	}
-	rsp, err := conn.Call("@Ping")
+
+	rsp, err := conn.call(time.Now().Add(pingResponseWait), "@Ping")
 	if err != nil {
 		return false
 	}
@@ -82,6 +89,25 @@ func (conn *Conn) TestConnection() bool {
 // Call invokes the procedure 'procedure' with parameter values 'params'
 // and returns a pointer to the received Response.
 func (conn *Conn) Call(procedure string, params ...interface{}) (*Response, error) {
+	if !conn.callDeadline.IsZero() {
+		return conn.call(conn.callDeadline, procedure, params...)
+	}
+	return conn.call(time.Now().Add(callResponseWait), procedure, params...)
+}
+
+// SetResponseDeadline overrides the default response deadline for a Call.
+//
+// A deadline is an absolute time after which reads from the connection
+// fail with a timeout error instead of blocking. The deadline applies
+// to all future calls, not just the immediately following call.
+//
+// A zero value for t means calls will time out according to the default
+// timeout of two minutes.
+func (conn *Conn) SetResponseDeadline(t time.Time) {
+	conn.callDeadline = t
+}
+
+func (conn *Conn) call(deadline time.Time, procedure string, params ...interface{}) (*Response, error) {
 	var call bytes.Buffer
 	var resp *bytes.Buffer
 	var err error
@@ -97,9 +123,12 @@ func (conn *Conn) Call(procedure string, params ...interface{}) (*Response, erro
 	if err := conn.writeMessage(call); err != nil {
 		return nil, err
 	}
+
+	conn.tcpConn.SetReadDeadline(deadline)
 	if resp, err = conn.readMessage(); err != nil {
 		return nil, err
 	}
+
 	return deserializeCallResponse(resp)
 }
 

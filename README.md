@@ -54,7 +54,6 @@ There are missing api methods.
 
 There are missing components expected for a production client: 
 
- * The client doesn't timeout network reads or writes.
  * The client doesn't reconnect closed sockets.
  * The client doesn't provide a high level interface to connect to multiple
    nodes of a VoltDB database.
